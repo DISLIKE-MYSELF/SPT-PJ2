@@ -84,15 +84,16 @@ class GreyBoxFuzzer(Fuzzer):
            If we reach new coverage,
            add inp to population and its coverage to population_coverage
         """
-        result, outcome = super().run(runner)
+        result, outcome, path_id = super().run(runner)
+
         if len(self.covered_line) != len(runner.all_coverage):
             self.covered_line |= runner.all_coverage
             if outcome == Runner.PASS:
                 # We have new coverage
-                seed = Seed(self.inp, runner.coverage())
+                seed = Seed(self.inp, runner.coverage(),path_id)
                 self.population.append(seed)
         if outcome == Runner.FAIL:
             self.last_crash_time = time.time()
             self.crash_map[self.inp] = result
 
-        return result, outcome
+        return result, outcome, path_id

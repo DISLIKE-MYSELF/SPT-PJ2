@@ -16,16 +16,39 @@ class Result:
         self.end_time = end_time
 
     def __str__(self):
-        return "Covered Lines: " + str(self.covered_line) + ", Crashes Num: " + str(self.crashes) + ", Start Time: " + str(self.start_time) + ", End Time: " + str(self.end_time)
+        return (
+            f"Covered Lines: {self.covered_line}, "
+            f"Crashes Num: {len(self.crashes)}, "
+            f"Start Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.start_time))}, "
+            f"End Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.end_time))}"
+        )
 
 
 if __name__ == "__main__":
-    f_runner = FunctionCoverageRunner(sample4)
-    seeds = load_object("corpus/corpus_4")
+    # 选择样例程序和对应的语料库
+    sample_program = sample4
+    corpus_path = "corpus/corpus_4"
 
-    grey_fuzzer = PathGreyBoxFuzzer(seeds=seeds, schedule=PathPowerSchedule(5), is_print=True)
+    f_runner = FunctionCoverageRunner(sample_program)
+    seeds = load_object(corpus_path)
+
+    schedule = PathPowerSchedule(power=5)
+    grey_fuzzer = PathGreyBoxFuzzer(seeds=seeds, schedule=schedule, is_print=True)
+
     start_time = time.time()
     grey_fuzzer.runs(f_runner, run_time=300)
-    res = Result(grey_fuzzer.covered_line, set(grey_fuzzer.crash_map.values()), start_time, time.time())
-    dump_object("_result" + os.sep + "Sample-4.pkl", res)
-    print(load_object("_result" + os.sep + "Sample-4.pkl"))
+    end_time = time.time()
+
+    res = Result(
+        coverage=grey_fuzzer.covered_line,
+        crashes=set(grey_fuzzer.crash_map.values()),
+        start_time=start_time,
+        end_time=end_time,
+    )
+
+    output_dir = "_result"
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, "Sample-4.pkl")
+
+    dump_object(output_file, res)
+    print(load_object(output_file))

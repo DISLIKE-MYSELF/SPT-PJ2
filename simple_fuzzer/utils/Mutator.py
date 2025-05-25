@@ -1,136 +1,110 @@
 import math
 import random
 import struct
-from typing import Any
+from typing import Any, Callable, Tuple
 
 
 def insert_random_character(s: str) -> str:
-    pos = random.randint(0, len(s))  # 包含 len(s)，允许插在末尾
-    rand_char = chr(random.randint(32, 127))
-    return s[:pos] + rand_char + s[pos:]
+    b = bytearray(s.encode('utf-8', errors='ignore'))
+    pos = random.randint(0, len(b))
+    b.insert(pos, random.randint(32, 127))
+    return b.decode('utf-8', errors='ignore')
 
 
 def flip_random_bits(s: str) -> str:
-    if not s:
-        return s
-
+    b = bytearray(s.encode('utf-8', errors='ignore'))
     N = random.choice([1, 2, 4])
-    total_bits = len(s) * 8
-    if total_bits < N:
-        return s  # 不足 N 位
-
-    bit_pos = random.randint(0, total_bits - N)
-    byte_index = bit_pos // 8
-    bit_offset = bit_pos % 8
-
-    b = bytearray(s.encode('latin1'))
+    bit_len = len(b) * 8
+    if bit_len < N:
+        return s
+    bit_pos = random.randint(0, bit_len - N)
     for i in range(N):
-        current_bit_pos = bit_pos + i
-        idx = current_bit_pos // 8
-        offset = current_bit_pos % 8
-        b[idx] ^= 1 << offset
-
-    return b.decode('latin1', errors='ignore')
+        byte_idx = (bit_pos + i) // 8
+        bit_idx = (bit_pos + i) % 8
+        b[byte_idx] ^= (1 << bit_idx)
+    return b.decode('utf-8', errors='ignore')
 
 
 def arithmetic_random_bytes(s: str) -> str:
-    if not s:
-        return s
-
+    b = bytearray(s.encode('utf-8', errors='ignore'))
     N = random.choice([1, 2, 4])
-    if len(s) < N:
+    if len(b) < N:
         return s
-
-    pos = random.randint(0, len(s) - N)
-    b = bytearray(s.encode('latin1'))
-
+    pos = random.randint(0, len(b) - N)
     for i in range(N):
-        num = b[pos + i]
         delta = random.randint(-35, 35)
-        b[pos + i] = (num + delta) % 256  # 保证在合法 byte 范围内
-
-    return b.decode('latin1', errors='ignore')
+        b[pos + i] = (b[pos + i] + delta) % 256
+    return b.decode('utf-8', errors='ignore')
 
 
 def interesting_random_bytes(s: str) -> str:
-    if not s:
-        return s
+    interesting_1 = [0, 1, 255, 127]
+    interesting_2 = [0, 1, 255, 256, 32767, 65535]
+    interesting_4 = [0, 1, 255, 4294967295]
 
-    interesting_1 = [0, 1, 16, 32, 64, 100, 127, 128, 255]
-    interesting_2 = [0, 256, 512, 1024, 0x7FFF, 0x8000, 0xFFFF]
-    interesting_4 = [0x00000000, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF]
-
+    b = bytearray(s.encode('utf-8', errors='ignore'))
     N = random.choice([1, 2, 4])
-    if len(s) < N:
+    if len(b) < N:
         return s
-
-    pos = random.randint(0, len(s) - N)
-    b = bytearray(s.encode('latin1'))
-
+    pos = random.randint(0, len(b) - N)
     if N == 1:
         val = random.choice(interesting_1)
         b[pos] = val % 256
     elif N == 2:
         val = random.choice(interesting_2)
-        for i in range(2):
-            b[pos + i] = (val >> (8 * i)) & 0xFF
-    elif N == 4:
+        val_bytes = val.to_bytes(2, byteorder='little', signed=False)
+        b[pos:pos+2] = val_bytes
+    else:
         val = random.choice(interesting_4)
-        for i in range(4):
-            b[pos + i] = (val >> (8 * i)) & 0xFF
-
-    return b.decode('latin1', errors='ignore')
-
+        val_bytes = val.to_bytes(4, byteorder='little', signed=False)
+        b[pos:pos+4] = val_bytes
+    return b.decode('utf-8', errors='ignore')
 
 
-def havoc_random_insert(s: str):
+def delete_random_character(s: str) -> str:
     """
-    基于 AFL 变异算法策略中的 random havoc 实现随机插入
-    随机选取一个位置，插入一段的内容，其中 75% 的概率是插入原文中的任意一段随机长度的内容，25% 的概率是插入一段随机长度的 bytes
+    删除 s 中的一个随机 byte，避免删除多字节字符的一部分导致乱码。
     """
-    # TODO
-    return s
+    b = bytearray(s.encode('utf-8', errors='ignore'))
+    if len(b) == 0:
+        return s
+    pos = random.randint(0, len(b) - 1)
+    del b[pos]
+    return b.decode('utf-8', errors='ignore')
+
 
 def havoc_random_insert(s: str) -> str:
-    pos = random.randint(0, len(s))
-    insert_len = random.randint(1, 10)
-    if random.random() < 0.75 and len(s) > 0:
-        start = random.randint(0, len(s) - 1)
-        end = min(len(s), start + insert_len)
-        snippet = s[start:end]
+    b = bytearray(s.encode('utf-8', errors='ignore'))
+    pos = random.randint(0, len(b))
+    if random.random() < 0.75 and len(b) > 0:
+        start = random.randint(0, len(b) - 1)
+        end = random.randint(start, len(b))
+        segment = b[start:end]
     else:
-        snippet = ''.join(chr(random.randint(32, 127)) for _ in range(insert_len))
+        segment = bytearray(random.randint(1, 10))
+        for i in range(len(segment)):
+            segment[i] = random.randint(32, 127)
+    b[pos:pos] = segment
+    return b.decode('utf-8', errors='ignore')
 
-    return s[:pos] + snippet + s[pos:]
 
 def havoc_random_replace(s: str) -> str:
-    if len(s) == 0:
+    b = bytearray(s.encode('utf-8', errors='ignore'))
+    if len(b) == 0:
         return s
-
-    replace_len = random.randint(1, min(10, len(s)))
-    pos = random.randint(0, len(s) - replace_len)
-    if random.random() < 0.75 and len(s) > replace_len:
-        start = random.randint(0, len(s) - replace_len)
-        snippet = s[start:start + replace_len]
+    start = random.randint(0, len(b) - 1)
+    max_len = len(b) - start
+    replace_len = random.randint(1, min(10, max_len))
+    if random.random() < 0.75 and len(b) > 1:
+        src_start = random.randint(0, len(b) - 1)
+        src_end = random.randint(src_start, len(b))
+        segment = b[src_start:src_end]
     else:
-        snippet = ''.join(chr(random.randint(32, 127)) for _ in range(replace_len))
-
-    return s[:pos] + snippet + s[pos + replace_len:]
-
-
-def delete_random_chunk(s: str) -> str:
-    """
-    随机删除 s 中的一段内容（chunk deletion），模拟字段缺失或数据截断等情况
-    删除长度为 [1, min(10, len(s))]，位置随机
-    """
-    if len(s) == 0:
-        return s
-
-    delete_len = random.randint(1, min(10, len(s)))
-    pos = random.randint(0, len(s) - delete_len)
-
-    return s[:pos] + s[pos + delete_len:]
-
+        segment = bytearray(random.randint(1, replace_len))
+        for i in range(len(segment)):
+            segment[i] = random.randint(32, 127)
+    b[start:start+replace_len] = segment[:replace_len]
+    return b.decode('utf-8', errors='ignore')
 
 
 class Mutator:
@@ -144,9 +118,30 @@ class Mutator:
             interesting_random_bytes,
             havoc_random_insert,
             havoc_random_replace,
-            delete_random_chunk
+            delete_random_character  # 新增的 Mutator
         ]
 
-    def mutate(self, inp: Any) -> Any:
+    def mutate(self, inp: Any) -> Tuple[str, str]:
         mutator = random.choice(self.mutators)
         return mutator(inp)
+
+
+def test_mutator():
+    mutator = Mutator()
+    test_inputs = [
+        "hello world!",         # 英文
+        "你好，世界！",           # 中文
+        "测试 test 123",        # 中英文混合
+        "",                     # 空字符串
+        "特殊字符：★☆♥♦♣♠",    # 特殊字符
+    ]
+
+    for i, inp in enumerate(test_inputs):
+        print(f"\nTest case {i + 1}: 原始输入 -> {repr(inp)}")
+        for _ in range(5):
+            mutated = mutator.mutate(inp)
+            print(f"  -> 变异结果: {repr(mutated)} ")
+
+
+if __name__ == '__main__':
+    test_mutator()

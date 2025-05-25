@@ -38,5 +38,6 @@ class FunctionCoverageRunner(Runner):
             stack_trace = "".join(traceback.format_tb(exc.__traceback__))
             result = hashlib.md5(stack_trace.encode()).hexdigest()
             outcome = self.FAIL
-
-        return result, outcome
+        # ➕ 添加 path_id，基于 coverage 哈希
+        path_id = hashlib.md5(str(self.coverage()).encode()).hexdigest()
+        return result, outcome, path_id
