@@ -36,7 +36,7 @@ if __name__ == "__main__":
     grey_fuzzer = PathGreyBoxFuzzer(seeds=seeds, schedule=schedule, is_print=True)
 
     start_time = time.time()
-    grey_fuzzer.runs(f_runner, run_time=300)
+    grey_fuzzer.runs(f_runner, run_time=7200)
     end_time = time.time()
 
     res = Result(
